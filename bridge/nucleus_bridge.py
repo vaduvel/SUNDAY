@@ -370,7 +370,14 @@ def _proposal_priority_score(proposal: Dict[str, Any]) -> float:
         else 0.0
     )
     age_weight = min(age_hours / 24.0, 1.0) * 0.08
-    score = status_weight + risk_weight + target_weight + gain_weight + eval_weight + age_weight
+    score = (
+        status_weight
+        + risk_weight
+        + target_weight
+        + gain_weight
+        + eval_weight
+        + age_weight
+    )
     return round(score, 4)
 
 
@@ -413,7 +420,9 @@ def _sort_recent_proposals(
         )
         return items
     items.sort(
-        key=lambda proposal: -float(proposal.get("updated_at") or proposal.get("created_at") or 0.0)
+        key=lambda proposal: (
+            -float(proposal.get("updated_at") or proposal.get("created_at") or 0.0)
+        )
     )
     return items
 
@@ -493,8 +502,11 @@ def _record_manual_governance_audit(record: Dict[str, Any]) -> None:
     try:
         from core.neuro_maintenance import NeuroMaintenanceJournal
 
-        NeuroMaintenanceJournal(Path(PROJECT_ROOT) / ".agent" / "neuro").record_governance(
-            record.get("mission_id") or f"manual:{record.get('proposal_id') or 'unknown'}",
+        NeuroMaintenanceJournal(
+            Path(PROJECT_ROOT) / ".agent" / "neuro"
+        ).record_governance(
+            record.get("mission_id")
+            or f"manual:{record.get('proposal_id') or 'unknown'}",
             {
                 "action": record.get("action"),
                 "status": record.get("status"),
@@ -657,7 +669,9 @@ def _build_runtime_cockpit_sync() -> Dict[str, Any]:
     neuro = get_neuro_brain(os.path.join(PROJECT_ROOT, ".agent", "neuro"))
     neuro_maintenance = NeuroMaintenanceJournal(Path(PROJECT_ROOT) / ".agent" / "neuro")
     knowledge_stats = _load_knowledge_graph_stats_snapshot()
-    latest_report_path = Path(PROJECT_ROOT) / ".agent" / "runtime_reports" / "latest_mission.json"
+    latest_report_path = (
+        Path(PROJECT_ROOT) / ".agent" / "runtime_reports" / "latest_mission.json"
+    )
     latest_report = None
     if latest_report_path.exists():
         try:
@@ -676,7 +690,11 @@ def _build_runtime_cockpit_sync() -> Dict[str, Any]:
             "maintenance": neuro_maintenance.status(limit=3),
         }
     )
-    latest_dod = latest_report.get("definition_of_done") if isinstance(latest_report, dict) else None
+    latest_dod = (
+        latest_report.get("definition_of_done")
+        if isinstance(latest_report, dict)
+        else None
+    )
 
     return {
         "identity": identity.summary(),
@@ -688,7 +706,9 @@ def _build_runtime_cockpit_sync() -> Dict[str, Any]:
                 "episodic": len(structured_memory.recall_episodic(limit=30)),
                 "lessons": len(load_lessons()),
             },
-            "memory_signal": structured_memory.get_full_context(session_id="chat")[:800],
+            "memory_signal": structured_memory.get_full_context(session_id="chat")[
+                :800
+            ],
         },
         "planning": {
             "modes": ["default", "ultraplan", "coordinator"],
@@ -715,11 +735,19 @@ def _build_runtime_cockpit_sync() -> Dict[str, Any]:
         "latest_mission": {
             "mission_id": latest_report.get("mission_id") if latest_report else None,
             "success": latest_report.get("success") if latest_report else None,
-            "verified_success": latest_report.get("verified_success") if latest_report else None,
+            "verified_success": latest_report.get("verified_success")
+            if latest_report
+            else None,
             "definition_of_done": latest_dod,
-            "governance_signal": latest_report.get("governance_signal") if latest_report else None,
-            "post_mission_governance": latest_report.get("post_mission_governance") if latest_report else None,
-            "mission_closure": latest_report.get("mission_closure") if latest_report else None,
+            "governance_signal": latest_report.get("governance_signal")
+            if latest_report
+            else None,
+            "post_mission_governance": latest_report.get("post_mission_governance")
+            if latest_report
+            else None,
+            "mission_closure": latest_report.get("mission_closure")
+            if latest_report
+            else None,
         },
         "harness": {
             "retry": True,
@@ -727,7 +755,7 @@ def _build_runtime_cockpit_sync() -> Dict[str, Any]:
             "fallback": True,
             "circuit_breaker": True,
         },
-}
+    }
 
 
 async def _refresh_runtime_cockpit_cache() -> None:
@@ -946,7 +974,9 @@ def _evict_stale_chat_sessions() -> None:
         _chat_sessions.items(),
         key=lambda item: float(item[1].get("updated_at") or 0.0),
     )
-    for session_key, _payload in oldest[: max(0, len(_chat_sessions) - _CHAT_SESSION_LIMIT)]:
+    for session_key, _payload in oldest[
+        : max(0, len(_chat_sessions) - _CHAT_SESSION_LIMIT)
+    ]:
         _chat_sessions.pop(session_key, None)
 
 
@@ -1228,7 +1258,20 @@ def _select_browser_tool_call(text: str) -> tuple[str, Dict[str, Any]]:
     url_match = re.search(r"https?://\S+", text or "")
     if url_match:
         url = url_match.group(0)
-        if any(word in lowered for word in ("extract", "sumarizează", "sumarizeaza", "read", "citește", "citeste", "content", "conținut", "continut")):
+        if any(
+            word in lowered
+            for word in (
+                "extract",
+                "sumarizează",
+                "sumarizeaza",
+                "read",
+                "citește",
+                "citeste",
+                "content",
+                "conținut",
+                "continut",
+            )
+        ):
             return "browser_extract", {"url": url, "goal": text}
         return "browser_navigate", {"url": url}
 
@@ -1257,7 +1300,10 @@ def _normalize_brain_error_for_user(text: str, *, context: str = "chat") -> str:
     if not normalized:
         return normalized
 
-    if "error: brain call timed out" in lowered or "error: brain stream timed out" in lowered:
+    if (
+        "error: brain call timed out" in lowered
+        or "error: brain stream timed out" in lowered
+    ):
         if context == "audit":
             return (
                 "Am pornit auditul, dar modelul a întârziat prea mult pe sumarul final. "
@@ -1319,7 +1365,9 @@ def _describe_live_mission_start(
 
     if mode == "ultraplan":
         detail = f" (complexitate {complexity})" if complexity is not None else ""
-        speech = "Am pornit misiunea și folosesc ultraplan pentru execuție mai profundă."
+        speech = (
+            "Am pornit misiunea și folosesc ultraplan pentru execuție mai profundă."
+        )
         chat = (
             "Am pornit misiunea prin orchestratorul JARVIS cu preflight ULTRAPLAN"
             f"{detail}. "
@@ -1434,14 +1482,12 @@ async def _push_mission_preflight_event(
     roles = preflight.get("coordinator_roles") or []
 
     if mode == "coordinator" and roles:
-        detail = (
-            f"Coordinator armed ({', '.join(roles)})"
-            + (f" • complexity {complexity}" if complexity is not None else "")
+        detail = f"Coordinator armed ({', '.join(roles)})" + (
+            f" • complexity {complexity}" if complexity is not None else ""
         )
     elif mode == "ultraplan":
-        detail = (
-            "ULTRAPLAN armed"
-            + (f" • complexity {complexity}" if complexity is not None else "")
+        detail = "ULTRAPLAN armed" + (
+            f" • complexity {complexity}" if complexity is not None else ""
         )
     else:
         detail = "Default mission path"
@@ -1467,7 +1513,11 @@ def _mission_run_kwargs(
     execution_goal: Optional[str] = None,
 ) -> Dict[str, Any]:
     guidance = ""
-    if execution_goal and execution_goal.strip() and execution_goal.strip() != mission_text.strip():
+    if (
+        execution_goal
+        and execution_goal.strip()
+        and execution_goal.strip() != mission_text.strip()
+    ):
         guidance = execution_goal
     return {
         "user_goal": mission_text,
@@ -1588,7 +1638,9 @@ def _summarize_live_mission_result(
     return f"Am terminat misiunea. Iată rezultatul pe scurt:\n\n{summary}"
 
 
-def _extract_markdown_section_bullets(text: str, heading: str, level: int = 2) -> List[str]:
+def _extract_markdown_section_bullets(
+    text: str, heading: str, level: int = 2
+) -> List[str]:
     if not text:
         return []
 
@@ -1627,11 +1679,21 @@ def _extract_code_audit_metadata(result: str) -> Optional[Dict[str, Any]]:
 
     files_scanned = _extract_markdown_metric(result, "Files scanned")
     total_source_lines = _extract_markdown_metric(result, "Total source lines")
-    files_to_review = _extract_markdown_section_bullets(result, "Files To Review First", level=2)
-    p1_findings = _extract_markdown_section_bullets(result, "P1 Critical blockers", level=3)
-    p2_findings = _extract_markdown_section_bullets(result, "P2 Delivery / structural risks", level=3)
-    p3_findings = _extract_markdown_section_bullets(result, "P3 Follow-up / cleanup", level=3)
-    todo_signals = _extract_markdown_section_bullets(result, "TODO / FIXME Signals", level=2)
+    files_to_review = _extract_markdown_section_bullets(
+        result, "Files To Review First", level=2
+    )
+    p1_findings = _extract_markdown_section_bullets(
+        result, "P1 Critical blockers", level=3
+    )
+    p2_findings = _extract_markdown_section_bullets(
+        result, "P2 Delivery / structural risks", level=3
+    )
+    p3_findings = _extract_markdown_section_bullets(
+        result, "P3 Follow-up / cleanup", level=3
+    )
+    todo_signals = _extract_markdown_section_bullets(
+        result, "TODO / FIXME Signals", level=2
+    )
     hotspot_files = _extract_markdown_section_bullets(result, "Hotspots", level=2)
 
     return {
@@ -1658,7 +1720,15 @@ async def _classify_principal_intent(
         return normalized_mode
 
     lowered = (text or "").strip().lower()
-    if lowered in {"stop", "stop now", "cancel", "anulează", "anuleaza", "oprește", "opreste"}:
+    if lowered in {
+        "stop",
+        "stop now",
+        "cancel",
+        "anulează",
+        "anuleaza",
+        "oprește",
+        "opreste",
+    }:
         return "interrupt"
 
     if _looks_like_strong_mission_request(text):
@@ -1725,10 +1795,14 @@ async def _interrupt_runtime(
             payload={"interrupted": interrupted, "reason": reason},
         )
 
-    event_name = "LIVE_SESSION_INTERRUPT" if source == "gemini-live" else "JARVIS_INTERRUPT"
+    event_name = (
+        "LIVE_SESSION_INTERRUPT" if source == "gemini-live" else "JARVIS_INTERRUPT"
+    )
     await push_event(
         event_name,
-        "Gemini Live requested interrupt." if source == "gemini-live" else "JARVIS interrupt requested.",
+        "Gemini Live requested interrupt."
+        if source == "gemini-live"
+        else "JARVIS interrupt requested.",
         {"session_id": session_id, "interrupted": interrupted, "source": source},
     )
     return {
@@ -1780,7 +1854,9 @@ async def _execute_principal_nonmission(
         result = await _call_engine_tool("cowork_command", {"command": text})
         if session is not None:
             session["cowork_active"] = True
-        speech_text = sanitize_assistant_output(_live_result_text(result), user_message=text)
+        speech_text = sanitize_assistant_output(
+            _live_result_text(result), user_message=text
+        )
         chat_text = speech_text
         if session is not None:
             _store_live_session_turn(
@@ -1815,7 +1891,9 @@ async def _execute_principal_nonmission(
             }
         tool_name, tool_args = _select_browser_tool_call(text)
         result = await _call_engine_tool(tool_name, tool_args)
-        speech_text = sanitize_assistant_output(_live_result_text(result), user_message=text)
+        speech_text = sanitize_assistant_output(
+            _live_result_text(result), user_message=text
+        )
         chat_text = speech_text
         if session is not None:
             _store_live_session_turn(
@@ -1849,7 +1927,9 @@ async def _execute_principal_nonmission(
                 "chat_text": "Computer control este blocat de policy-ul curent. Confirmă dacă vrei să continui.",
             }
         result = await _call_engine_tool("computer_task", {"task": text})
-        speech_text = sanitize_assistant_output(_live_result_text(result), user_message=text)
+        speech_text = sanitize_assistant_output(
+            _live_result_text(result), user_message=text
+        )
         chat_text = speech_text
         if session is not None:
             _store_live_session_turn(
@@ -1874,7 +1954,9 @@ async def _execute_principal_nonmission(
 
     visual_question = source == "gemini-live" and _looks_like_visual_live_question(text)
     observed_screen_summary = None
-    if visual_question and (screen_active or bool((session or {}).get("screen_active"))):
+    if visual_question and (
+        screen_active or bool((session or {}).get("screen_active"))
+    ):
         observed_screen_summary = await _observe_local_screen_summary()
 
     visual_context = _compose_live_visual_context(
@@ -1896,7 +1978,9 @@ async def _execute_principal_nonmission(
             f"Mesajul utilizatorului: {text}"
         )
 
-    _resolved_session_id, chat = _get_or_create_chat_session(session_id, mode_hint=mode_hint)
+    _resolved_session_id, chat = _get_or_create_chat_session(
+        session_id, mode_hint=mode_hint
+    )
     response = await chat.chat(chat_input)
     response = _normalize_brain_error_for_user(
         response,
@@ -1994,7 +2078,9 @@ async def _route_principal_command(
                 session["last_mission_request"] = text
                 session["last_mission_preflight"] = mission_preflight
                 session["updated_at"] = time.time()
-            speech_text, chat_text = _describe_live_mission_start(text, mission_preflight)
+            speech_text, chat_text = _describe_live_mission_start(
+                text, mission_preflight
+            )
             if session is not None:
                 _store_live_session_turn(
                     session,
@@ -2023,7 +2109,9 @@ async def _route_principal_command(
             "intent": "mission",
             "requires_mission_execution": True,
             "mission_preflight": mission_preflight,
-            "mission_execution_goal": _compose_principal_mission_goal(text, mission_preflight),
+            "mission_execution_goal": _compose_principal_mission_goal(
+                text, mission_preflight
+            ),
         }
 
     return await _execute_principal_nonmission(
@@ -2074,8 +2162,14 @@ async def _run_live_mission_background(
             mission_preflight=preflight,
             execution_goal=execution_goal,
         )
-        mission_meta = _extract_code_audit_metadata(result) if _looks_like_audit_mission(mission_text) else None
-        summary = _summarize_live_mission_result(mission_text, result, mission_meta=mission_meta)
+        mission_meta = (
+            _extract_code_audit_metadata(result)
+            if _looks_like_audit_mission(mission_text)
+            else None
+        )
+        summary = _summarize_live_mission_result(
+            mission_text, result, mission_meta=mission_meta
+        )
         session = _live_sessions.get(session_id)
         if session is not None:
             session["last_mission_result"] = result
@@ -2236,7 +2330,9 @@ def _fast_path_chat_mode(message: str) -> str | None:
     text = (message or "").strip().lower()
     if not text:
         return "CHAT"
-    if len(text) <= 24 and any(text.startswith(prefix) for prefix in SIMPLE_CHAT_PREFIXES):
+    if len(text) <= 24 and any(
+        text.startswith(prefix) for prefix in SIMPLE_CHAT_PREFIXES
+    ):
         return "CHAT"
     if any(marker in text for marker in MISSION_MARKERS):
         return "MISSION"
@@ -2276,7 +2372,9 @@ async def _call_brain_for_triage(message: str) -> str:
     )
 
 
-async def _classify_chat_mode(message: str, timeout_sec: float = TRIAGE_TIMEOUT_SEC) -> str:
+async def _classify_chat_mode(
+    message: str, timeout_sec: float = TRIAGE_TIMEOUT_SEC
+) -> str:
     fast_path = _fast_path_chat_mode(message)
     if fast_path:
         return fast_path
@@ -2431,7 +2529,9 @@ async def chat(req: ChatRequest):
 
     if not routed.get("ok", True):
         return {
-            "error": routed.get("chat_text") or routed.get("speech_text") or "JARVIS routing failed.",
+            "error": routed.get("chat_text")
+            or routed.get("speech_text")
+            or "JARVIS routing failed.",
             "status": routed.get("status", "error"),
             "intent": routed.get("intent"),
         }
@@ -2536,7 +2636,11 @@ async def stop_live_session(req: LiveSessionControlRequest):
 async def live_session_turn(req: LiveTurnRequest):
     session = _live_sessions.get(req.session_id)
     if not session:
-        return {"ok": False, "error": "Live session not found.", "status": "missing_session"}
+        return {
+            "ok": False,
+            "error": "Live session not found.",
+            "status": "missing_session",
+        }
 
     text = (req.user_text or "").strip()
     if not text:
@@ -2582,7 +2686,9 @@ async def live_session_turn(req: LiveTurnRequest):
 _active_voice_tasks = set()
 
 
-async def _stream_principal_result(payload: Dict[str, Any], voice_enabled: bool = False):
+async def _stream_principal_result(
+    payload: Dict[str, Any], voice_enabled: bool = False
+):
     """Stream a routed principal-command result back to the main chat UI."""
     try:
         full_response = (
@@ -2862,7 +2968,10 @@ async def get_identity_anchor():
 @app.get("/api/runtime/cockpit")
 async def get_runtime_cockpit():
     """Aggregate runtime intel for the dashboard."""
-    if _knowledge_graph_age_sec() > KNOWLEDGE_GRAPH_CACHE_TTL_SEC and not _knowledge_graph_cache["refreshing"]:
+    if (
+        _knowledge_graph_age_sec() > KNOWLEDGE_GRAPH_CACHE_TTL_SEC
+        and not _knowledge_graph_cache["refreshing"]
+    ):
         asyncio.create_task(_refresh_knowledge_graph_stats_cache())
 
     cached = _runtime_cockpit_cache.get("data")
@@ -2897,7 +3006,10 @@ async def get_runtime_cockpit():
         "refreshing": True,
         "cached": False,
         "identity": {"agent_name": "J.A.R.V.I.S.", "codename": "Booting"},
-        "structured_memory": {"counts": {}, "memory_signal": "Runtime snapshot warming up."},
+        "structured_memory": {
+            "counts": {},
+            "memory_signal": "Runtime snapshot warming up.",
+        },
         "planning": {"modes": ["default", "ultraplan", "coordinator"]},
         "sessions": [],
         "tracing": {"total_spans": 0, "by_kind": {}, "by_status": {}},
@@ -2943,8 +3055,12 @@ async def get_runtime_cockpit():
             "fallback": True,
             "circuit_breaker": True,
         },
-        **({"error": _runtime_cockpit_cache["error"]} if _runtime_cockpit_cache.get("error") else {}),
-}
+        **(
+            {"error": _runtime_cockpit_cache["error"]}
+            if _runtime_cockpit_cache.get("error")
+            else {}
+        ),
+    }
 
 
 @app.get("/api/governance/recent")
@@ -2979,7 +3095,15 @@ async def get_recent_governance(
             ],
             "target_type": ["all", "skill", "prompt", "routing", "eval_policy"],
             "gate_decision": ["all", "promote", "hold", "reject"],
-            "action": ["all", "approve", "queue_eval", "hold", "reject", "capture", "fix"],
+            "action": [
+                "all",
+                "approve",
+                "queue_eval",
+                "hold",
+                "reject",
+                "capture",
+                "fix",
+            ],
             "sort_by": ["priority", "newest", "expected_gain", "eval_score"],
         },
     }
@@ -2994,7 +3118,9 @@ async def get_recent_governance(
             target_type=target_type,
             query=normalized_query,
         )
-        recent_proposals = _sort_recent_proposals(filtered_proposals, sort_by)[:capped_limit]
+        recent_proposals = _sort_recent_proposals(filtered_proposals, sort_by)[
+            :capped_limit
+        ]
         approval_queue = _build_approval_queue(filtered_proposals)[:capped_limit]
         recent_governance = _filter_governance_history(
             _load_governance_history(limit=max(capped_limit * 3, 20)),
@@ -3055,7 +3181,9 @@ async def get_neuro_maintenance(limit: int = 10):
     try:
         from core.neuro_maintenance import NeuroMaintenanceJournal
 
-        return NeuroMaintenanceJournal(Path(PROJECT_ROOT) / ".agent" / "neuro").status(limit=capped_limit)
+        return NeuroMaintenanceJournal(Path(PROJECT_ROOT) / ".agent" / "neuro").status(
+            limit=capped_limit
+        )
     except Exception as exc:
         logger.warning("[BRIDGE] Neuro maintenance fetch failed: %s", exc)
         return {"error": str(exc)}
@@ -3081,10 +3209,14 @@ async def governance_proposal_action(req: GovernanceProposalActionRequest):
         if normalized_action == "queue_eval":
             updated = proposals.queue_for_eval(req.proposal_id, eval_run_id=reason)
         elif normalized_action == "hold":
-            updated = proposals.mark_on_hold(req.proposal_id, reason or "Held by operator")
+            updated = proposals.mark_on_hold(
+                req.proposal_id, reason or "Held by operator"
+            )
             gate_decision = "hold"
         elif normalized_action == "reject":
-            updated = proposals.reject(req.proposal_id, reason or "Rejected by operator")
+            updated = proposals.reject(
+                req.proposal_id, reason or "Rejected by operator"
+            )
             gate_decision = "reject"
         elif normalized_action == "approve":
             from core.self_evolving_skills import SelfEvolvingSkills
@@ -3152,7 +3284,9 @@ async def governance_proposal_action(req: GovernanceProposalActionRequest):
 @app.post("/api/governance/proposal/bulk-action")
 async def governance_bulk_proposal_action(req: GovernanceBulkActionRequest):
     """Apply a single safe human action to multiple proposals."""
-    proposal_ids = [proposal_id.strip() for proposal_id in req.proposal_ids if proposal_id.strip()]
+    proposal_ids = [
+        proposal_id.strip() for proposal_id in req.proposal_ids if proposal_id.strip()
+    ]
     if not proposal_ids:
         return {"error": "No proposal IDs provided."}
 
@@ -4290,7 +4424,9 @@ async def voice_converse(
             mode_hint="voice",
         )
         jarvis_response = await chat.chat(user_text)
-        jarvis_response = _normalize_brain_error_for_user(jarvis_response, context="chat")
+        jarvis_response = _normalize_brain_error_for_user(
+            jarvis_response, context="chat"
+        )
         jarvis_response = sanitize_assistant_output(
             jarvis_response,
             user_message=user_text,
@@ -4424,7 +4560,10 @@ async def memory_execution_biases(task: str, mission_type: str = "general"):
         memories = get_memory_consolidation().get_execution_biases(
             {"task": task, "user_goal": task, "mission_type": mission_type}
         )
-        return {"count": len(memories), "biases": [memory.to_dict() for memory in memories]}
+        return {
+            "count": len(memories),
+            "biases": [memory.to_dict() for memory in memories],
+        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -4880,6 +5019,42 @@ async def get_current_context():
         from core.context_graph import get_context_graph
 
         return get_context_graph().get_current_context()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SELF-IMPROVEMENT LOOP
+# ═══════════════════════════════════════════════════════════════
+
+
+@app.post("/api/self-improve")
+async def self_improve_endpoint(scope: str = "all", dry_run: bool = True):
+    """Run self-improvement loop to find and fix gaps in the codebase.
+
+    Args:
+        scope: "all", "core", or "tools" - which directories to scan
+        dry_run: If True, only report gaps without applying fixes
+    """
+    try:
+        from core.self_improvement_loop import (
+            run_self_improvement,
+            get_self_improvement_status,
+        )
+
+        result = await run_self_improvement(scope=scope, dry_run=dry_run)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/self-improve/status")
+async def self_improve_status():
+    """Get self-improvement loop status."""
+    try:
+        from core.self_improvement_loop import get_self_improvement_status
+
+        return get_self_improvement_status()
     except Exception as e:
         return {"error": str(e)}
 
