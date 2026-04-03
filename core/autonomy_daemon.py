@@ -30,6 +30,7 @@ ACTIONABLE_KEYWORDS = (
     "implement",
     "fix",
     "connect",
+    "conecta",
     "add",
     "improve",
     "rescrie",
@@ -38,6 +39,13 @@ ACTIONABLE_KEYWORDS = (
     "conecteaza",
     "aplic",
     "modifica",
+    # Romanian
+    "imbunatatesc",
+    "rezolv",
+    "scriu",
+    "creez",
+    "fac",
+    "reconectez",
 )
 
 
@@ -153,7 +161,9 @@ class AutonomyDaemon:
             try:
                 if "confidence:" in thought_str.lower():
                     conf_part = thought_str.lower().split("confidence:")[1].split()[0]
-                    confidence = float(conf_part.replace(".", "").replace(",", "."))
+                    confidence = float(conf_part.replace("%", "").strip())
+                    if confidence > 1.0:
+                        confidence = confidence / 100.0
             except:
                 pass
 
