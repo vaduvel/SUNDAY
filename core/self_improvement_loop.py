@@ -311,12 +311,15 @@ async def implement_patches(
             continue
 
         # If sandbox test passes, apply to production
-        # Create backup
-        backup_path = f"/tmp/sunday_patches/{Path(file_path).name}.bak"
+        # Create backup directory first
+        backup_dir = Path("/tmp/sunday_patches")
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        backup_path = str(backup_dir / f"{Path(file_path).name}.bak")
         shutil.copy2(file_path, backup_path)
 
         # Write to temp first
-        tmp_path = f"/tmp/sunday_patches/{int(time.time())}_{Path(file_path).name}"
+        tmp_path = str(backup_dir / f"{int(time.time())}_{Path(file_path).name}")
         shutil.copy2(file_path, tmp_path)
 
         applied.append(

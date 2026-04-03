@@ -138,9 +138,7 @@ class SimpleSandbox:
         code_file.write_text(code)
 
         # Run with python
-        result = self.run_command(
-            f"python3 {code_file}", cwd=workspace, timeout=timeout
-        )
+        result = self.run_command(f"python3 script.py", cwd=workspace, timeout=timeout)
 
         return result
 
