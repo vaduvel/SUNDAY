@@ -262,7 +262,10 @@ def create_proposals(gaps: list[Gap], scope: str = "all") -> list[dict]:
 async def implement_patches(
     proposals: list[dict], dry_run: bool = True
 ) -> tuple[list, list]:
-    """Stage 4: Apply auto-approved patches."""
+    """Stage 4: Apply auto-approved patches with sandbox testing."""
+    from core.simple_sandbox import SimpleSandbox
+
+    sandbox = SimpleSandbox()
     applied = []
     failed = []
 
@@ -283,6 +286,31 @@ async def implement_patches(
             )
             continue
 
+        # Stage 4b: TEST IN SANDBOX FIRST
+        workspace = sandbox.create_workspace(f"patch_{proposal['id']}")
+
+        # Copy original file to sandbox
+        sandbox_path = f"{workspace}/{Path(file_path).name}"
+        shutil.copy2(file_path, sandbox_path)
+
+        # Test import in sandbox
+        sandbox_result = sandbox.run_python(
+            f"import {Path(file_path).stem}", timeout=15, workspace=workspace
+        )
+
+        if not sandbox_result.get("success"):
+            failed.append(
+                {
+                    "id": proposal["id"],
+                    "error": f"Sandbox test failed: {sandbox_result.get('stderr', 'Unknown error')}",
+                    "file": file_path,
+                    "sandbox_result": sandbox_result,
+                }
+            )
+            sandbox.cleanup(workspace)
+            continue
+
+        # If sandbox test passes, apply to production
         # Create backup
         backup_path = f"/tmp/sunday_patches/{Path(file_path).name}.bak"
         shutil.copy2(file_path, backup_path)
@@ -305,7 +333,10 @@ async def implement_patches(
 
 
 def test_patches(applied: list, failed: list) -> tuple[list, list]:
-    """Stage 5: Run import smoke tests."""
+    """Stage 5: Run import smoke tests in SANDBOX with DOJO option."""
+    from core.simple_sandbox import SimpleSandbox
+
+    sandbox = SimpleSandbox()
     success = []
     import_failures = []
 
@@ -319,21 +350,42 @@ def test_patches(applied: list, failed: list) -> tuple[list, list]:
         if module_name.startswith("test_") or module_name == "__init__":
             continue
 
-        result = _run_command(f"python3 -c 'import {module_name}'", timeout=15)
+        # Test in sandbox first (ISOLATED from production)
+        workspace = sandbox.create_workspace(f"test_{module_name}")
+        sandbox_path = f"{workspace}/{Path(file_path).name}"
+        shutil.copy2(file_path, sandbox_path)
 
-        if "Error" in result or "Traceback" in result:
+        # Run import test in sandbox - isolated environment
+        sandbox_result = sandbox.run_python(
+            f"import {module_name}", timeout=15, workspace=workspace
+        )
+
+        if sandbox_result.get("success"):
+            success.append(module_name)
+            logger.info(f"🧪 SANDBOX TEST PASSED: {module_name}")
+        else:
+            error_msg = sandbox_result.get(
+                "stderr", sandbox_result.get("stdout", "Unknown")
+            )[:200]
             import_failures.append(
                 {
                     "module": module_name,
-                    "error": result[:200],
+                    "error": error_msg,
                     "backup": patch.get("backup"),
                 }
             )
-            # Rollback
-            if patch.get("backup"):
+            logger.error(f"❌ SANDBOX TEST FAILED: {module_name} - {error_msg}")
+
+            # ROLLBACK from backup
+            if patch.get("backup") and Path(patch["backup"]).exists():
                 shutil.copy2(patch["backup"], file_path)
-        else:
-            success.append(module_name)
+                logger.info(f"🔄 ROLLED BACK: {file_path}")
+
+        # ALWAYS cleanup sandbox workspace (even on success)
+        try:
+            sandbox.cleanup(workspace)
+        except:
+            pass
 
     logger.info(f"🧪 TEST: {len(success)} passed, {len(import_failures)} failed")
     return success, import_failures
